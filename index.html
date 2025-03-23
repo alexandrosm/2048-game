@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>2048 Game</title>
+    <meta name="description" content="Play the addictive 2048 puzzle game! Join the tiles to get to the 2048 tile!">
+    <meta name="theme-color" content="#000000">
+    <link rel="stylesheet" href="style.css">
+    <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" href="icons/icon-192x192.png">
+</head>
+
+<body>
+    <div class="container">
+        <header>
+            <h1>2048</h1>
+            <div class="score-container">
+                <div class="score-box">
+                    <span class="score-title">SCORE</span>
+                    <span id="score">0</span>
+                </div>
+                <div class="score-box">
+                    <span class="score-title">BEST</span>
+                    <span id="best-score">0</span>
+                </div>
+            </div>
+        </header>
+
+        <div class="game-intro">
+            <p class="game-instructions">Join the tiles, get to <strong>2048!</strong></p>
+            <p class="game-instructions">Use your <strong>arrow keys</strong> to move the tiles.</p>
+            <button id="new-game-button">New Game</button>
+            <div class="mode-controls">
+                <label class="dark-mode-toggle">
+                    <input type="checkbox" id="dark-mode-toggle">
+                    <span class="slider round"></span>
+                    <span class="label-text">Dark Mode</span>
+                </label>
+                <div class="opacity-control">
+                    <label for="opacity-slider">Opacity:</label>
+                    <input type="range" id="opacity-slider" min="0.2" max="1" step="0.05" value="1">
+                </div>
+            </div>
+        </div>
+
+        <div class="game-container">
+            <div class="game-message">
+                <p></p>
+                <div class="game-message-buttons">
+                    <button id="retry-button">Try again</button>
+                </div>
+            </div>
+
+            <div class="grid-container">
+                <!-- Grid cells will be created with JavaScript -->
+            </div>
+
+            <div class="tile-container"></div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+    <script>
+        // Register service worker for PWA functionality
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('./service-worker.js')
+                    .then(registration => {
+                        console.log('Service Worker registered successfully:', registration);
+                    })
+                    .catch(error => {
+                        console.log('Service Worker registration failed:', error);
+                    });
+            });
+        }
+    </script>
+</body>
+
+</html>

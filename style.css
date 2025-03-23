@@ -1,0 +1,556 @@
+/* Base styles and reset */
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+/* Game variables for easy adjustment */
+:root {
+    --grid-size: 4;
+    --cell-size: 90px;
+    --grid-gap: 15px;
+    --border-radius: 6px;
+    --tile-font-size: 35px;
+
+    /* Dark mode variables */
+    --bg-color: #faf8ef;
+    --text-color: #776e65;
+    --grid-bg-color: #bbada0;
+    --cell-bg-color: rgba(238, 228, 218, 0.35);
+    --button-bg-color: #8f7a66;
+    --button-hover-bg-color: #9f8b76;
+    --message-bg-color: rgba(238, 228, 218, 0.73);
+    --win-message-bg-color: rgba(237, 194, 46, 0.5);
+    --tile-opacity: 1;
+}
+
+/* Dark mode variables */
+.dark-mode {
+    --bg-color: #000000;
+    --text-color: #777777;
+    /* Darker gray instead of white */
+    --grid-bg-color: #000000;
+    --cell-bg-color: #000000;
+    /* Pure black cells */
+    --button-bg-color: #333333;
+    --button-hover-bg-color: #444444;
+    --message-bg-color: rgba(0, 0, 0, 0.8);
+    --win-message-bg-color: rgba(0, 0, 0, 0.8);
+    opacity: var(--global-opacity, 1);
+    /* Apply opacity globally to dark mode */
+}
+
+/* Responsive variables */
+@media (max-width: 520px) {
+    :root {
+        --cell-size: 65px;
+        --grid-gap: 10px;
+        --tile-font-size: 25px;
+    }
+}
+
+body {
+    font-family: Arial, sans-serif;
+    background-color: var(--bg-color);
+    color: var(--text-color);
+    display: flex;
+    justify-content: center;
+    padding: 20px;
+    transition: background-color 0.3s, color 0.3s;
+}
+
+.container {
+    width: 100%;
+    max-width: 500px;
+}
+
+/* Header with logo and scores */
+header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+}
+
+h1 {
+    font-size: 80px;
+    font-weight: bold;
+    margin: 0;
+    color: var(--text-color);
+}
+
+.score-container {
+    display: flex;
+    gap: 10px;
+}
+
+.score-box {
+    background-color: var(--grid-bg-color);
+    padding: 15px 25px;
+    border-radius: 3px;
+    color: white;
+    text-align: center;
+    min-width: 100px;
+}
+
+/* Darker text for score boxes in dark mode */
+.dark-mode .score-box {
+    color: #777777;
+}
+
+.score-title {
+    font-size: 13px;
+    display: block;
+}
+
+#score,
+#best-score {
+    font-size: 25px;
+    font-weight: bold;
+}
+
+/* Game instructions */
+.game-intro {
+    margin-bottom: 20px;
+}
+
+.game-intro p {
+    margin-bottom: 10px;
+}
+
+/* Hide instructions in dark mode */
+.dark-mode .game-instructions {
+    display: none;
+}
+
+button {
+    background-color: var(--button-bg-color);
+    color: white;
+    border: none;
+    border-radius: 3px;
+    padding: 10px 20px;
+    font-weight: bold;
+    cursor: pointer;
+    font-size: 16px;
+    transition: background-color 0.3s;
+}
+
+button:hover {
+    background-color: var(--button-hover-bg-color);
+}
+
+/* Darker text for buttons in dark mode */
+.dark-mode button {
+    color: #777777;
+}
+
+/* Game container to hold all game elements */
+.game-container {
+    position: relative;
+    margin-bottom: 30px;
+    width: fit-content;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+/* Mode controls */
+.mode-controls {
+    margin-top: 15px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    align-items: center;
+}
+
+/* Dark mode toggle */
+.dark-mode-toggle {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    cursor: pointer;
+}
+
+.dark-mode-toggle input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.dark-mode-toggle .slider {
+    position: relative;
+    display: inline-block;
+    width: 50px;
+    height: 24px;
+    background-color: #ccc;
+    border-radius: 24px;
+    transition: .4s;
+    margin-right: 10px;
+}
+
+.dark-mode-toggle .slider:before {
+    position: absolute;
+    content: "";
+    height: 18px;
+    width: 18px;
+    left: 3px;
+    bottom: 3px;
+    background-color: white;
+    border-radius: 50%;
+    transition: .4s;
+}
+
+.dark-mode-toggle input:checked+.slider {
+    background-color: #333;
+}
+
+.dark-mode-toggle input:checked+.slider:before {
+    transform: translateX(26px);
+}
+
+/* Opacity control */
+.opacity-control {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.opacity-control input[type="range"] {
+    width: 150px;
+    height: 8px;
+    border-radius: 5px;
+    background: #ddd;
+    outline: none;
+    opacity: 0.7;
+    transition: opacity .2s;
+}
+
+.opacity-control input[type="range"]:hover {
+    opacity: 1;
+}
+
+/* Game board */
+.grid-container {
+    position: relative;
+    background-color: var(--grid-bg-color);
+    padding: var(--grid-gap);
+    border-radius: var(--border-radius);
+    display: grid;
+    grid-template-columns: repeat(var(--grid-size), var(--cell-size));
+    grid-template-rows: repeat(var(--grid-size), var(--cell-size));
+    gap: var(--grid-gap);
+    z-index: 1;
+    transition: background-color 0.3s;
+}
+
+.grid-cell {
+    width: var(--cell-size);
+    height: var(--cell-size);
+    background-color: var(--cell-bg-color);
+    border-radius: 3px;
+    transition: background-color 0.3s;
+}
+
+/* Tile container and tiles */
+.tile-container {
+    position: absolute;
+    top: var(--grid-gap);
+    left: var(--grid-gap);
+    z-index: 2;
+    /* Size matches the grid content area exactly */
+    width: calc(var(--cell-size) * var(--grid-size) + var(--grid-gap) * (var(--grid-size) - 1));
+    height: calc(var(--cell-size) * var(--grid-size) + var(--grid-gap) * (var(--grid-size) - 1));
+    /* Debug outline */
+    /*border: 1px solid red;*/
+}
+
+.tile {
+    position: absolute;
+    width: var(--cell-size);
+    height: var(--cell-size);
+    border-radius: 3px;
+    font-weight: bold;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 10;
+    font-size: var(--tile-font-size);
+    /* Enhanced transition for faster movement */
+    transition: transform 0.1s, left 0.1s cubic-bezier(0.25, 0.1, 0.25, 1), top 0.1s cubic-bezier(0.25, 0.1, 0.25, 1);
+    /* Add a subtle shadow for depth */
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    /* Improve text rendering */
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+}
+
+/* Tile colors - standard mode */
+body:not(.dark-mode) .tile-2 {
+    background-color: #eee4da;
+    color: #776e65;
+}
+
+body:not(.dark-mode) .tile-4 {
+    background-color: #ede0c8;
+    color: #776e65;
+}
+
+body:not(.dark-mode) .tile-8 {
+    background-color: #f2b179;
+    color: #f9f6f2;
+}
+
+body:not(.dark-mode) .tile-16 {
+    background-color: #f59563;
+    color: #f9f6f2;
+}
+
+body:not(.dark-mode) .tile-32 {
+    background-color: #f67c5f;
+    color: #f9f6f2;
+}
+
+body:not(.dark-mode) .tile-64 {
+    background-color: #f65e3b;
+    color: #f9f6f2;
+}
+
+body:not(.dark-mode) .tile-128 {
+    background-color: #edcf72;
+    color: #f9f6f2;
+    font-size: calc(var(--tile-font-size) * 0.85);
+}
+
+body:not(.dark-mode) .tile-256 {
+    background-color: #edcc61;
+    color: #f9f6f2;
+    font-size: calc(var(--tile-font-size) * 0.85);
+}
+
+body:not(.dark-mode) .tile-512 {
+    background-color: #edc850;
+    color: #f9f6f2;
+    font-size: calc(var(--tile-font-size) * 0.85);
+}
+
+body:not(.dark-mode) .tile-1024 {
+    background-color: #edc53f;
+    color: #f9f6f2;
+    font-size: calc(var(--tile-font-size) * 0.7);
+}
+
+body:not(.dark-mode) .tile-2048 {
+    background-color: #edc22e;
+    color: #f9f6f2;
+    font-size: calc(var(--tile-font-size) * 0.7);
+}
+
+body:not(.dark-mode) .tile-super {
+    background-color: #3c3a32;
+    color: #f9f6f2;
+    font-size: calc(var(--tile-font-size) * 0.6);
+}
+
+/* Tile colors - dark mode */
+.dark-mode .tile {
+    background-color: #000000 !important;
+    transition: color 0.3s;
+    box-shadow: none;
+}
+
+.dark-mode .tile-2 {
+    color: #eee4da;
+}
+
+.dark-mode .tile-4 {
+    color: #ede0c8;
+}
+
+.dark-mode .tile-8 {
+    color: #f2b179;
+}
+
+.dark-mode .tile-16 {
+    color: #f59563;
+}
+
+.dark-mode .tile-32 {
+    color: #f67c5f;
+}
+
+.dark-mode .tile-64 {
+    color: #f65e3b;
+}
+
+.dark-mode .tile-128 {
+    color: #edcf72;
+    font-size: calc(var(--tile-font-size) * 0.85);
+}
+
+.dark-mode .tile-256 {
+    color: #edcc61;
+    font-size: calc(var(--tile-font-size) * 0.85);
+}
+
+.dark-mode .tile-512 {
+    color: #edc850;
+    font-size: calc(var(--tile-font-size) * 0.85);
+}
+
+.dark-mode .tile-1024 {
+    color: #edc53f;
+    font-size: calc(var(--tile-font-size) * 0.7);
+}
+
+.dark-mode .tile-2048 {
+    color: #edc22e;
+    font-size: calc(var(--tile-font-size) * 0.7);
+}
+
+.dark-mode .tile-super {
+    color: #9d9c94;
+    font-size: calc(var(--tile-font-size) * 0.6);
+}
+
+/* Game state messages */
+.game-message {
+    display: none;
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    background: var(--message-bg-color);
+    z-index: 100;
+    text-align: center;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    animation: fade-in 0.8s ease;
+    border-radius: var(--border-radius);
+    width: 100%;
+    height: 100%;
+    transition: background 0.3s;
+}
+
+.game-message.game-over {
+    display: flex;
+}
+
+.game-message.game-won {
+    display: flex;
+    background: var(--win-message-bg-color);
+    color: var(--text-color);
+}
+
+.game-message p {
+    font-size: 60px;
+    font-weight: bold;
+    margin-bottom: 20px;
+}
+
+/* Animations */
+@keyframes fade-in {
+    0% {
+        opacity: 0;
+    }
+
+    50% {
+        opacity: 0.5;
+    }
+
+    100% {
+        opacity: 1;
+    }
+}
+
+/* Remove duplicate transition - already defined in .tile */
+/* .tile {
+    transition: left 0.15s ease-in-out, top 0.15s ease-in-out;
+} */
+
+.tile-new {
+    animation: appear 0.1s ease-out;
+    animation-fill-mode: backwards;
+}
+
+.tile-merged {
+    z-index: 20;
+    animation: merge-pop 0.1s ease-in-out;
+    /* Add a temporary glow effect on merge - only in light mode */
+    box-shadow: 0 0 10px rgba(237, 194, 46, 0.5);
+}
+
+/* Remove glow effect in dark mode */
+.dark-mode .tile-merged {
+    box-shadow: none;
+}
+
+@keyframes appear {
+    0% {
+        opacity: 0;
+        transform: scale(0);
+    }
+
+    60% {
+        opacity: 0.9;
+        transform: scale(1.1);
+    }
+
+    100% {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+@keyframes merge-pop {
+    0% {
+        transform: scale(0.9);
+    }
+
+    50% {
+        transform: scale(1.2);
+    }
+
+    100% {
+        transform: scale(1);
+    }
+}
+
+/* Add a score animation */
+@keyframes score-pop {
+    0% {
+        transform: scale(1);
+    }
+
+    50% {
+        transform: scale(1.2);
+    }
+
+    100% {
+        transform: scale(1);
+    }
+}
+
+.score-addition {
+    position: absolute;
+    right: 30px;
+    color: #776e65;
+    font-size: 20px;
+    font-weight: bold;
+    opacity: 0;
+    animation: score-pop 0.1s ease-in-out;
+    animation-fill-mode: both;
+    z-index: 100;
+}
+
+/* Responsive adjustments */
+@media screen and (max-width: 520px) {
+    h1 {
+        font-size: 50px;
+    }
+
+    .game-message p {
+        font-size: 40px;
+    }
+}
