@@ -1,5 +1,5 @@
 {
-    "name": "2048 Game",
+    "name": "2048",
     "short_name": "2048",
     "description": "Join the numbers to get to the 2048 tile!",
     "start_url": "./index.html",
