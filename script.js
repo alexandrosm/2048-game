@@ -12,9 +12,11 @@ document.addEventListener('DOMContentLoaded', () => {
     let canContinue = false;
     let isAnimating = false; // Track if animations are in progress
 
-    // Dark mode and opacity settings
-    let isDarkMode = localStorage.getItem('darkMode') === 'true';
-    let globalOpacity = parseFloat(localStorage.getItem('globalOpacity') || '1');
+    // Theme brightness setting (1.0 = light mode, 0.0 = full dark mode)
+    let themeBrightness = parseFloat(localStorage.getItem('themeBrightness') || '1');
+
+    // Game history for undo functionality - limited to a single move
+    let lastGameState = null; // Store only the previous state
 
     const gridContainer = document.querySelector('.grid-container');
     const tileContainer = document.querySelector('.tile-container');
@@ -22,46 +24,287 @@ document.addEventListener('DOMContentLoaded', () => {
     const bestScoreElement = document.getElementById('best-score');
     const gameMessage = document.querySelector('.game-message');
     const messageText = gameMessage.querySelector('p');
-    const newGameButton = document.getElementById('new-game-button');
     const retryButton = document.getElementById('retry-button');
+    const restartButton = document.getElementById('restart-button');
+    const undoButton = document.getElementById('undo-button');
 
-    // UI controls for dark mode and opacity
-    const darkModeToggle = document.getElementById('dark-mode-toggle');
-    const opacitySlider = document.getElementById('opacity-slider');
+    // UI control for theme
+    const themeSlider = document.getElementById('theme-slider');
 
-    // Function to apply dark mode
-    function applyDarkMode(enabled) {
-        if (enabled) {
-            document.body.classList.add('dark-mode');
-            darkModeToggle.checked = true;
-        } else {
-            document.body.classList.remove('dark-mode');
-            darkModeToggle.checked = false;
-        }
-        localStorage.setItem('darkMode', enabled);
+    // Function to interpolate between two colors based on theme brightness
+    function interpolateColor(darkColor, lightColor, factor) {
+        // Parse the colors into RGB components
+        const darkRGB = parseColor(darkColor);
+        const lightRGB = parseColor(lightColor);
+
+        // Interpolate between the colors
+        const r = Math.round(darkRGB.r + (lightRGB.r - darkRGB.r) * factor);
+        const g = Math.round(darkRGB.g + (lightRGB.g - darkRGB.g) * factor);
+        const b = Math.round(darkRGB.b + (lightRGB.b - darkRGB.b) * factor);
+        const a = darkRGB.a !== undefined ?
+            (darkRGB.a + (lightRGB.a - darkRGB.a) * factor) :
+            1;
+
+        // Format the result as a CSS color string
+        return a < 1 ?
+            `rgba(${r}, ${g}, ${b}, ${a.toFixed(2)})` :
+            `rgb(${r}, ${g}, ${b})`;
     }
 
-    // Function to apply global opacity for dark mode
-    function applyGlobalOpacity(value) {
-        document.documentElement.style.setProperty('--global-opacity', value);
-        opacitySlider.value = value;
-        localStorage.setItem('globalOpacity', value);
+    // Helper function to parse color strings into RGB components
+    function parseColor(color) {
+        // Handle rgba format
+        let match = color.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([0-9.]+))?\)/);
+        if (match) {
+            return {
+                r: parseInt(match[1]),
+                g: parseInt(match[2]),
+                b: parseInt(match[3]),
+                a: match[4] ? parseFloat(match[4]) : 1
+            };
+        }
+
+        // Handle hex format
+        match = color.match(/#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})/i);
+        if (match) {
+            return {
+                r: parseInt(match[1], 16),
+                g: parseInt(match[2], 16),
+                b: parseInt(match[3], 16),
+                a: 1
+            };
+        }
+
+        // Default fallback
+        return { r: 0, g: 0, b: 0, a: 1 };
+    }
+
+    // Apply theme based on brightness value
+    function applyTheme(brightness) {
+        // Store the theme brightness as a CSS variable
+        document.documentElement.style.setProperty('--theme-brightness', brightness);
+
+        // Update slider UI
+        themeSlider.value = brightness;
+
+        // Save to localStorage
+        localStorage.setItem('themeBrightness', brightness);
+
+        // Interpolate and apply all theme colors
+        const root = document.documentElement;
+
+        // Main theme colors
+        root.style.setProperty('--bg-color',
+            interpolateColor(getComputedStyle(root).getPropertyValue('--dark-bg-color').trim(),
+                getComputedStyle(root).getPropertyValue('--light-bg-color').trim(),
+                brightness));
+
+        root.style.setProperty('--text-color',
+            interpolateColor(getComputedStyle(root).getPropertyValue('--dark-text-color').trim(),
+                getComputedStyle(root).getPropertyValue('--light-text-color').trim(),
+                brightness));
+
+        root.style.setProperty('--grid-bg-color',
+            interpolateColor(getComputedStyle(root).getPropertyValue('--dark-grid-bg-color').trim(),
+                getComputedStyle(root).getPropertyValue('--light-grid-bg-color').trim(),
+                brightness));
+
+        root.style.setProperty('--cell-bg-color',
+            interpolateColor(getComputedStyle(root).getPropertyValue('--dark-cell-bg-color').trim(),
+                getComputedStyle(root).getPropertyValue('--light-cell-bg-color').trim(),
+                brightness));
+
+        root.style.setProperty('--button-bg-color',
+            interpolateColor(getComputedStyle(root).getPropertyValue('--dark-button-bg-color').trim(),
+                getComputedStyle(root).getPropertyValue('--light-button-bg-color').trim(),
+                brightness));
+
+        root.style.setProperty('--button-hover-bg-color',
+            interpolateColor(getComputedStyle(root).getPropertyValue('--dark-button-hover-bg-color').trim(),
+                getComputedStyle(root).getPropertyValue('--light-button-hover-bg-color').trim(),
+                brightness));
+
+        root.style.setProperty('--message-bg-color',
+            interpolateColor(getComputedStyle(root).getPropertyValue('--dark-message-bg-color').trim(),
+                getComputedStyle(root).getPropertyValue('--light-message-bg-color').trim(),
+                brightness));
+
+        root.style.setProperty('--win-message-bg-color',
+            interpolateColor(getComputedStyle(root).getPropertyValue('--dark-win-message-bg-color').trim(),
+                getComputedStyle(root).getPropertyValue('--light-win-message-bg-color').trim(),
+                brightness));
+
+        // Game instructions visibility - fade out as it gets darker, and hide completely at 0
+        document.querySelectorAll('.game-instructions').forEach(el => {
+            el.style.opacity = brightness < 0.2 ? 0 : brightness;
+        });
+
+        // Apply to tiles
+        document.querySelectorAll('.tile').forEach(tile => {
+            const tileClass = Array.from(tile.classList).find(cls => cls.startsWith('tile-'));
+            if (!tileClass) return;
+
+            applyThemingToTile(tile, brightness);
+        });
+
+        // Handle merged tile glow effect - remove at darkest settings
+        document.querySelectorAll('.tile-merged').forEach(tile => {
+            const glowOpacity = brightness < 0.2 ? 0 : brightness * 0.5;
+            tile.style.boxShadow = glowOpacity > 0 ?
+                `0 0 10px rgba(237, 194, 46, ${glowOpacity})` : 'none';
+        });
+
+        // Handle score box text color - make darker at lowest brightness
+        document.querySelectorAll('.score-box').forEach(box => {
+            // Darken the text as the theme gets darker
+            let textBrightness;
+            if (brightness < 0.2) {
+                textBrightness = 0.7; // Match original dark mode text brightness
+            } else {
+                textBrightness = 0.7 + (brightness * 0.3);
+            }
+            box.style.color = `rgba(255, 255, 255, ${textBrightness})`;
+        });
+
+        // Handle button text color - make darker at lowest brightness
+        document.querySelectorAll('button').forEach(btn => {
+            // Darken the text as the theme gets darker
+            let textBrightness;
+            if (brightness < 0.2) {
+                textBrightness = 0.7; // Match original dark mode text brightness
+            } else {
+                textBrightness = 0.7 + (brightness * 0.3);
+            }
+            btn.style.color = `rgba(255, 255, 255, ${textBrightness})`;
+        });
+
+        // Apply global opacity for extreme dark mode (to match original implementation)
+        if (brightness < 0.2) {
+            // Scale from 0.2 to 1.0 opacity as brightness goes from 0.0 to 0.2
+            const opacity = brightness === 0 ? 0.2 : brightness;
+            document.body.style.opacity = opacity;
+        } else {
+            document.body.style.opacity = 1;
+        }
+    }
+
+    // Map of tile values to their dark mode text colors - predefined for reliability
+    const darkModeTextColors = {
+        '2': '#eee4da',
+        '4': '#ede0c8',
+        '8': '#f2b179',
+        '16': '#f59563',
+        '32': '#f67c5f',
+        '64': '#f65e3b',
+        '128': '#edcf72',
+        '256': '#edcc61',
+        '512': '#edc850',
+        '1024': '#edc53f',
+        '2048': '#edc22e',
+        'super': '#9d9c94'
+    };
+
+    // Map of tile values to their light mode colors - for interpolation
+    const lightModeTextColors = {
+        '2': '#776e65',
+        '4': '#776e65',
+        '8': '#f9f6f2',
+        '16': '#f9f6f2',
+        '32': '#f9f6f2',
+        '64': '#f9f6f2',
+        '128': '#f9f6f2',
+        '256': '#f9f6f2',
+        '512': '#f9f6f2',
+        '1024': '#f9f6f2',
+        '2048': '#f9f6f2',
+        'super': '#f9f6f2'
+    };
+
+    // Helper function to apply theming to a specific tile
+    function applyThemingToTile(tile, brightness) {
+        // Get tile value from element
+        const value = tile.textContent;
+        const tileClass = tile.classList.contains('tile-super') ? 'super' : value;
+
+        // Assign dark and light colors based on the tile value
+        const darkText = darkModeTextColors[tileClass] || '#ffffff';
+        const lightText = lightModeTextColors[tileClass] || '#776e65';
+
+        // Background colors are simpler - always black in dark mode, variable in light mode
+        const darkBg = '#000000';
+        const lightBg = getComputedStyle(tile).getPropertyValue('--light-tile-bg').trim() || '#eee4da';
+
+        // Interpolate and apply the colors
+        tile.style.backgroundColor = interpolateColor(darkBg, lightBg, brightness);
+        tile.style.color = interpolateColor(darkText, lightText, brightness);
+
+        // Adjust box shadow based on brightness - remove at darkest settings
+        const shadowOpacity = brightness < 0.2 ? 0 : brightness * 0.1;
+        tile.style.boxShadow = shadowOpacity > 0 ?
+            `0 2px 4px rgba(0, 0, 0, ${shadowOpacity})` : 'none';
+
+        // Special case for darkest mode
+        if (brightness <= 0.01) {
+            tile.style.backgroundColor = '#000000';
+            tile.style.boxShadow = 'none';
+            // Use the direct color mapping for exact dark mode colors
+            tile.style.color = darkText;
+        }
     }
 
     // Initialize appearance settings
     function initAppearance() {
-        applyDarkMode(isDarkMode);
-        applyGlobalOpacity(globalOpacity);
+        // Update the slider UI based on the stored value
+        themeSlider.value = themeBrightness;
 
-        // Set up event listeners for appearance controls
-        darkModeToggle.addEventListener('change', () => {
-            isDarkMode = darkModeToggle.checked;
-            applyDarkMode(isDarkMode);
-        });
+        // Force an initial application of the theme with a small delay
+        // to ensure all elements are properly initialized
+        setTimeout(() => {
+            // Store original value
+            const originalValue = themeBrightness;
 
-        opacitySlider.addEventListener('input', () => {
-            globalOpacity = opacitySlider.value;
-            applyGlobalOpacity(globalOpacity);
+            // First force a reset to light mode to ensure all elements are initialized properly
+            if (originalValue < 0.5) {
+                // Temporarily set to light mode and apply
+                themeBrightness = 1;
+                applyTheme(1);
+
+                // Then set back to the original value with a small delay
+                setTimeout(() => {
+                    themeBrightness = originalValue;
+                    applyTheme(originalValue);
+
+                    // Extra specific settings for darkest mode
+                    if (themeBrightness <= 0.01) {
+                        document.body.style.opacity = 0.2;
+                        document.querySelectorAll('.game-instructions').forEach(el => {
+                            el.style.opacity = 0;
+                        });
+
+                        // Also ensure tiles have the correct colors in darkest mode
+                        document.querySelectorAll('.tile').forEach(tile => {
+                            tile.style.backgroundColor = '#000000';
+                            tile.style.boxShadow = 'none';
+
+                            // Get the correct text color based on the tile class
+                            const tileClass = Array.from(tile.classList).find(cls => cls.startsWith('tile-'));
+                            if (tileClass) {
+                                const darkText = getComputedStyle(tile).getPropertyValue('--dark-tile-text').trim();
+                                tile.style.color = darkText;
+                            }
+                        });
+                    }
+                }, 100);
+            } else {
+                // If already in light mode range, just apply directly
+                applyTheme(themeBrightness);
+            }
+        }, 50);
+
+        // Set up event listener for theme slider
+        themeSlider.addEventListener('input', () => {
+            themeBrightness = parseFloat(themeSlider.value);
+            applyTheme(themeBrightness);
         });
     }
 
@@ -84,11 +327,72 @@ document.addEventListener('DOMContentLoaded', () => {
         gameWon = false;
         canContinue = false;
         isAnimating = false;
+        // Reset game history when starting a new game
+        lastGameState = null;
         updateScore(0);
         clearTiles();
         gameMessage.classList.remove('game-over', 'game-won');
         addRandomTile();
         addRandomTile();
+    }
+
+    // Save the current game state to history
+    function saveGameState() {
+        // Create a deep copy of the current grid
+        const gridCopy = grid.map(row => [...row]);
+
+        // Save current state (just store one state for single-level undo)
+        lastGameState = {
+            grid: gridCopy,
+            score: score,
+            gameOver: gameOver,
+            gameWon: gameWon
+        };
+
+        // Enable undo button
+        undoButton.disabled = false;
+    }
+
+    // Restore the previous game state
+    function undoMove() {
+        // If no history or animating, do nothing
+        if (!lastGameState || isAnimating) return;
+
+        isAnimating = true;
+
+        // Restore grid and score
+        grid = lastGameState.grid;
+        score = lastGameState.score;
+        gameOver = lastGameState.gameOver;
+        gameWon = lastGameState.gameWon;
+
+        // Clear the history after using it
+        lastGameState = null;
+
+        // Update score display
+        updateScore(0);
+
+        // Redraw the grid
+        renderGrid(grid);
+
+        // Disable undo button after a single use
+        undoButton.disabled = true;
+
+        // Always hide game message when undoing, regardless of game state
+        gameMessage.style.display = 'none';
+        gameMessage.style.opacity = 0;
+        gameMessage.classList.remove('game-over', 'game-won');
+
+        // Force reset gameOver to false if this was the game over move
+        // This ensures we can continue playing after undoing the game over move
+        if (gameOver) {
+            gameOver = false;
+        }
+
+        // Reset animation state after animations finish
+        setTimeout(() => {
+            isAnimating = false;
+        }, ANIMATION_DURATION);
     }
 
     function createEmptyGrid() {
@@ -159,6 +463,9 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!merged) {
             tile.style.animationDelay = `${Math.random() * 0.1}s`;
         }
+
+        // Apply theme styling immediately based on current theme brightness
+        applyThemingToTile(tile, themeBrightness);
 
         tileContainer.appendChild(tile);
         return tile;
@@ -320,8 +627,17 @@ document.addEventListener('DOMContentLoaded', () => {
     let lastMoveDirection = null;
 
     function moveTiles(direction) {
-        // Don't allow moves during animations or if game is over
+        // If the game is over and user presses left, treat it as an undo action
+        if (gameOver && direction === 'left' && !isAnimating && lastGameState) {
+            undoMove();
+            return true;
+        }
+
+        // Don't allow other moves during animations or if game is over
         if (isAnimating || (gameOver && !canContinue)) return false;
+
+        // Save current state before making the move
+        saveGameState();
 
         // Store the direction for use in rendering
         lastMoveDirection = direction;
@@ -400,8 +716,13 @@ document.addEventListener('DOMContentLoaded', () => {
             }, ANIMATION_DURATION);
 
             return true;
+        } else {
+            // If no move was made, nullify the saved state
+            lastGameState = null;
+            // Also disable the undo button
+            undoButton.disabled = true;
+            return false;
         }
-        return false;
     }
 
     function moveUp() {
@@ -530,8 +851,12 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // Event listeners
-    newGameButton.addEventListener('click', initGame);
+    restartButton.addEventListener('click', initGame);
     retryButton.addEventListener('click', initGame);
+    undoButton.addEventListener('click', undoMove);
+
+    // Initially disable undo button until a move is made
+    undoButton.disabled = true;
 
     // Listen for both keydown events and button clicks
     document.addEventListener('keydown', event => {
